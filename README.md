@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Prompt Chains
 
-## Getting Started
+Tool for building and testing the prompt chains behind
+[Caption This](https://github.com/nathangendler/hello-world-nextjs). Same Supabase project as
+the app and its admin area; separate Next.js app and Vercel deployment.
 
-First, run the development server:
+## What it does
+
+- **Chains:** create, edit, and delete prompt chains, with a mix weight that sets how often
+  the app uses each one.
+- **Steps:** create, edit, and delete a chain's steps. Each step has a model, a temperature,
+  prompts, and a switch for whether it sees the photo. A step reads the previous step's output
+  through `${previousOutput}`.
+- **Reorder:** move a step up, down, or straight to a position ("move step 2 to step 1").
+  The whole new order is applied in one database transaction.
+- **Generate:** run a chain on a photo and see what every step produced, the prompt each one
+  was sent, how long it took, and the final captions.
+- **Media:** everything a chain has generated, test runs from this tool and real moments from
+  the app alike.
+- **Theme:** light, dark, or follow the system, remembered per browser.
+
+## Access
+
+Every route except the login and "not authorized" pages needs a Google sign-in **and**
+`profiles.is_superadmin = true`. The proxy checks it, every page and action checks it again,
+and row-level security in Postgres only lets a superadmin session change chains and steps.
+
+## How generation works
+
+This tool does not hold AI provider keys. It asks the main app to run the chain
+(`POST /api/chains/run`), sending the signed-in admin's Supabase token. The main app verifies
+the token, checks the caller is a superadmin, runs the steps with its own keys, and saves the
+result as a test generation. So the pipeline and the keys live in exactly one place.
+
+## Setup
+
+Copy `.env.example` to `.env.local` and fill in the Supabase URL and anon key (same as the
+main app) and the main app's URL. The schema lives in the main repo (`supabase-pipeline.sql`,
+`supabase-chain-tool.sql`).
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm test
+npm run typecheck
+npm run lint
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
