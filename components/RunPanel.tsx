@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import Image from "next/image";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { parseRunError, parseRunResult, type RunResult } from "@/lib/chains/run";
@@ -51,12 +52,28 @@ export function RunPanel({
   mainAppUrl: string;
 }) {
   const router = useRouter();
+  const inputId = useId();
   const [file, setFile] = useState<File | null>(null);
+  // Bumped to remount the hidden input, so the same photo can be picked again after Remove.
+  const [inputKey, setInputKey] = useState(0);
   const [note, setNote] = useState("");
   const [captionCount, setCaptionCount] = useState(5);
   const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  function removePhoto() {
+    setFile(null);
+    setInputKey((key) => key + 1);
+    setStatus(null);
+  }
 
   function generate() {
     if (!file) return;
@@ -119,36 +136,104 @@ export function RunPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Photo
-          <input type="file" accept={TYPES.join(",")} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
-        </label>
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          Note, available to steps as {"${note}"} (optional)
-          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} className="field min-w-56" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Captions wanted
+      <div className="panel grid gap-5 p-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-semibold">Photo</span>
+          <label
+            htmlFor={inputId}
+            className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded border border-dashed border-line bg-surface p-2 text-center hover:opacity-80"
+          >
+            {preview ? (
+              <Image
+                src={preview}
+                alt="Selected photo"
+                width={224}
+                height={224}
+                unoptimized
+                className="h-full w-full rounded object-contain"
+              />
+            ) : (
+              <>
+                <span className="btn-outline btn-xs">Choose a photo</span>
+                <span className="text-xs text-muted">JPEG, PNG, or WebP</span>
+              </>
+            )}
+          </label>
           <input
-            type="number"
-            min={1}
-            max={16}
-            value={captionCount}
-            onChange={(e) => setCaptionCount(Math.min(16, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
-            className="field w-20"
+            key={inputKey}
+            id={inputId}
+            type="file"
+            accept={TYPES.join(",")}
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setStatus(null);
+            }}
+            className="sr-only"
           />
-        </label>
-        <button type="button" disabled={pending || !file || stepCount === 0} onClick={generate} className="btn-primary">
-          {pending ? "Generating…" : "Generate"}
-        </button>
+          {file && (
+            <div className="flex items-center gap-3 text-xs text-muted">
+              <span className="min-w-0 flex-1 truncate" title={file.name}>
+                {file.name}
+              </span>
+              <label htmlFor={inputId} className="cursor-pointer underline">
+                Change
+              </label>
+              <button type="button" onClick={removePhoto} className="underline">
+                Remove
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span>
+              <span className="font-semibold">Note</span>{" "}
+              <span className="text-muted">Optional. Steps can use it as {"${note}"}.</span>
+            </span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={200}
+              rows={3}
+              placeholder="e.g. waited 40 minutes for this bagel"
+              className="field"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span>
+              <span className="font-semibold">Captions wanted</span>{" "}
+              <span className="text-muted">Steps can use it as {"${captionCount}"}.</span>
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={16}
+              value={captionCount}
+              onChange={(e) => setCaptionCount(Math.min(16, Math.max(1, Math.floor(Number(e.target.value) || 1))))}
+              className="field w-24"
+            />
+          </label>
+          <div className="mt-auto flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={pending || !file || stepCount === 0}
+              onClick={generate}
+              className="btn-primary"
+            >
+              {pending ? "Generating…" : "Generate"}
+            </button>
+            <span role="status" className="text-sm text-muted">
+              {status ??
+                (stepCount === 0
+                  ? "Add at least one step before generating."
+                  : !file
+                    ? "Choose a photo to generate."
+                    : `Ready to run ${stepCount} ${stepCount === 1 ? "step" : "steps"}.`)}
+            </span>
+          </div>
+        </div>
       </div>
-      {stepCount === 0 && <p className="text-sm">Add at least one step before generating.</p>}
-      {status && (
-        <p role="status" className="text-sm font-semibold">
-          {status}
-        </p>
-      )}
 
       {result && (
         <div className="flex flex-col gap-3">
