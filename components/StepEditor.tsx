@@ -28,7 +28,10 @@ function StepFields({
   pending: boolean;
 }) {
   const [name, setName] = useState(step?.name ?? "");
-  const [llmModelId, setLlmModelId] = useState(step?.llm_model_id ?? models[0]?.id ?? "");
+  // A new step starts on the first active model; an inactive one would just fail when run.
+  const [llmModelId, setLlmModelId] = useState(
+    step?.llm_model_id ?? (models.find((model) => model.is_active) ?? models[0])?.id ?? ""
+  );
   const [temperature, setTemperature] = useState(step ? Number(step.temperature) : 1);
   const [systemPrompt, setSystemPrompt] = useState(step?.system_prompt ?? "");
   const [userPrompt, setUserPrompt] = useState(step?.user_prompt ?? "");
@@ -133,6 +136,11 @@ export function StepEditor({
         <span className="text-sm text-muted">
           {model?.name ?? "missing model"} · temp {Number(step.temperature)} · {step.uses_image ? "sees the photo" : "text only"}
         </span>
+        {model && !model.is_active && (
+          <span className="rounded border border-line px-1.5 py-0.5 text-xs font-semibold">
+            Inactive model: this step will likely fail. Edit it to pick another.
+          </span>
+        )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
           <button
             type="button"

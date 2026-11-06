@@ -39,7 +39,8 @@ export async function loadChain(
   const [chain, steps, models] = await Promise.all([
     supabase.from("prompt_chains").select("*").eq("id", id).maybeSingle(),
     supabase.from("prompt_chain_steps").select("*").eq("chain_id", id).order("position"),
-    supabase.from("llm_models").select("*").order("name"),
+    // Active models first, so the step form never offers an unusable one by default.
+    supabase.from("llm_models").select("*").order("is_active", { ascending: false }).order("name"),
   ]);
   if (chain.error) throw new Error(`Failed to load the chain: ${chain.error.message}`);
   if (steps.error) throw new Error(`Failed to load its steps: ${steps.error.message}`);
